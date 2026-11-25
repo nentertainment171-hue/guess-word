@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Guess the word</title>
+<style>
+:root{--bg:#e9f1f4;--card:#fff;--ink:#15303d;--mute:#5b7480;--line:#c9d8df;--tile:#f3f8fa;--accent:#f0a82b;--accent-ink:#2a1c00;--hit:#2a8a63;--miss:#c4533b;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#13222a;--card:#1b2f39;--ink:#e6f0f3;--mute:#92aab5;--line:#2e4856;--tile:#223a46;--hit:#4cc08f;--miss:#e8836d;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Avenir Next","Segoe UI",Roboto,sans-serif;line-height:1.45}
+.app{max-width:520px;margin:0 auto;padding:16px}
+.top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+h1{font-family:Georgia,serif;font-size:1.8rem;margin:0}
+h2{font-size:1.15rem;margin:0 0 12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:12px}
+.mute{color:var(--mute);font-size:.9rem;margin:10px 0 0}
+.btn{background:var(--accent);color:var(--accent-ink);border:0;border-radius:10px;padding:12px 18px;font-size:1rem;font-weight:700;cursor:pointer}
+.btn.s{background:transparent;color:var(--mute);border:1px solid var(--line);padding:6px 12px;font-size:.85rem;font-weight:400}
+button:focus-visible,input:focus-visible{outline:3px solid var(--hit);outline-offset:2px}
+input{width:100%;font-size:1.1rem;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--tile);color:var(--ink)}
+.row{display:flex;gap:10px;align-items:center}
+.err{color:var(--miss);font-weight:700;min-height:1.4em;margin-top:8px;overflow-wrap:anywhere}
+.code{font:700 2rem Georgia,serif;letter-spacing:6px;text-align:center;margin:10px 0}
+.turn{font-weight:700;margin-bottom:10px}
+.boxes{display:grid;grid-template-columns:repeat(var(--n,5),minmax(0,1fr));gap:clamp(2px,1.2vw,8px);max-width:calc(var(--n,5)*58px);margin:6px auto 16px}
+.box{aspect-ratio:3/4;min-width:0;border:clamp(1px,.5vw,2px) solid var(--line);background:var(--tile);border-radius:clamp(3px,1vw,8px);display:grid;place-items:center;font:700 clamp(.65rem,calc(62vw / var(--n,5)),1.8rem) Georgia,serif}
+.box.f{border-color:var(--hit);color:var(--hit)}
+.label{font-size:.85rem;color:var(--mute)}
+.alpha{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:10px}
+.alpha button{padding:10px 0;font-size:1rem;font-weight:700;border:1px solid var(--line);background:var(--tile);color:var(--ink);border-radius:8px;cursor:pointer}
+.alpha button:disabled{cursor:default;opacity:.45}
+.alpha button.hit{background:var(--hit);color:#fff;border-color:var(--hit);opacity:1}
+.alpha button.miss{color:var(--miss);text-decoration:line-through}
+#msg{min-height:1.5em;font-weight:700}
+#log{font-size:.88rem;color:var(--mute);margin:6px 0 0;padding-left:18px}
+hr{border:0;border-top:1px solid var(--line);margin:16px 0}
+.res{margin-top:10px;font-weight:800;font-size:1.1rem}
+.win{color:var(--hit)}.bad{color:var(--miss)}
+.coin{width:90px;height:90px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font:700 2rem Georgia,serif;margin:6px auto 14px}
+.coin.spin{animation:flip 1.4s ease-out forwards}
+@keyframes flip{to{transform:rotateY(1080deg)}}
+@media (prefers-reduced-motion:reduce){.coin.spin{animation:none}}
+.secret{background:var(--accent);color:var(--accent-ink);border-radius:12px;padding:8px 12px;text-align:center;margin-bottom:12px}
+.secret .label{color:var(--accent-ink);font-weight:700;letter-spacing:1.5px;font-size:.7rem}
+.sw{font:700 1.5rem Georgia,serif;letter-spacing:3px;overflow-wrap:anywhere}
+.banner{font:800 2.2rem Georgia,serif;text-align:center;margin:6px 0 12px;animation:pop .6s ease-out}
+@keyframes pop{0%{transform:scale(.3);opacity:0}70%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+#cf{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:30}
+@media (prefers-reduced-motion:reduce){.banner{animation:none}}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;z-index:20;padding-top:env(safe-area-inset-top,0px)}
+.sheet{background:var(--card);color:var(--ink);width:100%;max-width:520px;max-height:85vh;overflow:auto;border-radius:16px 16px 0 0;padding:18px;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}
+.btn.s.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+ol.h{padding-left:20px;margin:0}ol.h li{margin-bottom:10px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="app">
+<div class="top"><h1>Guess the word</h1><div class="row"><span id="who" class="label"></span><button class="btn s" id="home" hidden>Home</button><button class="btn s" id="how" hidden>How to play the game</button><button class="btn s" id="out" hidden>Sign out</button></div></div>
+
+<section id="login" class="card" hidden>
+<h2>Sign in to play with a friend</h2>
+<button class="btn" id="g">Continue with Google</button>
+<div class="err" id="gerr"></div>
+</section>
+
+<section id="lobby" class="card" hidden>
+<h2>Play with a friend</h2>
+<button class="btn" id="create">Create a room</button>
+<hr>
+<label class="label" for="code">or enter your friend’s room code</label>
+<div class="row" style="margin-top:6px"><input id="code" maxlength="5" autocomplete="off" autocapitalize="characters"><button class="btn" id="join">Join</button></div>
+<div class="err" id="lerr"></div>
+</section>
+
+<section id="wait" class="card" hidden>
+<h2 id="wt"></h2>
+<div class="code" id="rc"></div>
+<p class="mute" id="wp"></p>
+<button class="btn s" id="leave1" style="margin-top:12px">Leave room</button>
+</section>
+
+<section id="word" class="card" hidden>
+<h2>Type your word</h2>
+<div class="row"><input id="w" maxlength="20" autocomplete="off" autocapitalize="characters" aria-label="Your secret word"><button class="btn" id="done">Done</button></div>
+<div class="err" id="werr"></div>
+<p class="mute">Only you can see your word. Your friend sees just the number of letters.</p>
+</section>
+
+<section id="toss" class="card" hidden style="text-align:center">
+<h2>Toss: who asks first?</h2>
+<div class="coin" id="coin">?</div>
+<p class="turn" id="tossres"></p>
+<button class="btn" id="start" hidden>Start game</button>
+</section>
+
+<section id="game" class="card" hidden>
+<div class="secret" id="secret" hidden><div class="label">YOUR SECRET WORD</div><div class="sw" id="sw"></div></div>
+<div class="banner" id="banner" hidden></div>
+<div class="turn" id="turn"></div>
+<div class="label" id="oplabel" style="text-align:center"></div>
+<div class="boxes" id="boxes"></div>
+<label for="guess" class="label" style="display:block;margin-bottom:6px">type here your guessed word</label>
+<div class="row"><input id="guess" autocomplete="off" autocapitalize="characters"><button class="btn" id="sub">Submit</button></div>
+<div class="res" id="res" aria-live="polite"></div>
+<button class="btn" id="again" hidden style="margin-top:12px">Play again</button>
+<hr>
+<h2>guess a letter of your opponent</h2>
+<div class="alpha" id="alpha"></div>
+<div id="msg" aria-live="polite"></div>
+<ul id="log"></ul>
+<button class="btn s" id="leave2" style="margin-top:14px">Leave room</button>
+</section>
+</div>
+
+<div id="help" class="ov" hidden role="dialog" aria-modal="true" aria-labelledby="ht">
+<div class="sheet">
+<div class="row" style="justify-content:space-between;margin-bottom:10px"><h2 id="ht" style="margin:0">How to play the game</h2><button class="btn s" id="hx">Close</button></div>
+<div class="row" style="margin-bottom:12px"><button class="btn s" id="lb">বাংলা</button><button class="btn s" id="le">English</button></div>
+<div id="hb"></div>
+</div>
+</div>
+
+<canvas id="cf" hidden></canvas>
+
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {getAuth,GoogleAuthProvider,signInWithPopup,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import {getFirestore,doc,setDoc,getDoc,updateDoc,onSnapshot,collection,addDoc,arrayUnion,deleteField} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+const app=initializeApp({
+  apiKey:"AIzaSyC1CAYNrfpK2zcP_gXhpA2sLBFHhDiGfxE",
+  authDomain:"guess-the-word-58846.firebaseapp.com",
+  projectId:"guess-the-word-58846",
+  storageBucket:"guess-the-word-58846.firebasestorage.app",
+  messagingSenderId:"628965615041",
+  appId:"1:628965615041:web:066bac8bb143b38778bb40"
+});
+const auth=getAuth(app),db=getFirestore(app);
+const $=s=>document.querySelector(s);
+const ALPHA="ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+let me=null,code=null,room=null,moves=[],unR=null,unM=null,myWord="",started=false,tossShown=false,round=null,lastTurn=false;
+const busy=new Set();
+
+function show(id){["login","lobby","wait","word","toss","game"].forEach(s=>$("#"+s).hidden=s!==id)}
+function ord(n){const s=["th","st","nd","rd"],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0])}
+function say(l,p){return p.length?"Yes, there is a "+l+" in "+p.map(ord).join(", ")+(p.length>1?" positions":" position"):"There is no \u201C"+l+"\u201D"}
+const roomRef=()=>doc(db,"rooms",code);
+const curMoves=()=>moves.filter(m=>(m.r||0)===((room&&room.round)||0));
+const wk=()=>"gtw-word-"+code+"-"+((room&&room.round)||0);
+const sk=()=>"gtw-started-"+code+"-"+((room&&room.round)||0);
+const movesRef=()=>collection(db,"rooms",code,"moves");
+
+$("#g").onclick=async()=>{
+  try{await signInWithPopup(auth,new GoogleAuthProvider())}
+  catch(e){console.error("Google Sign-In Error:",e);$("#gerr").textContent="Sign-in failed: "+e.code+" | "+e.message+" | site: "+location.hostname}
+};
+$("#out").onclick=()=>{leave();signOut(auth)};
+onAuthStateChanged(auth,u=>{
+  me=u;$("#out").hidden=!u;$("#how").hidden=!u;$("#home").hidden=!u;$("#who").textContent=u?(u.displayName||"").split(" ")[0]:"";
+  if(!u){show("login");return}
+  const saved=localStorage.getItem("gtw-room");
+  if(saved)enter(saved);else show("lobby");
+});
+
+$("#create").onclick=async()=>{
+  try{
+    let c;
+    for(;;){
+      c=Array.from({length:5},()=>"ABCDEFGHJKLMNPQRSTUVWXYZ"[Math.random()*24|0]).join("");
+      if(!(await getDoc(doc(db,"rooms",c))).exists())break;
+    }
+    await setDoc(doc(db,"rooms",c),{host:me.uid,players:[me.uid],names:{[me.uid]:(me.displayName||"").split(" ")[0]},len:{},t:Date.now()});
+    enter(c);
+  }catch(e){console.error("Create room error:",e);$("#lerr").textContent="Could not create the room: "+e.code}
+};
+$("#join").onclick=async()=>{
+  const c=$("#code").value.trim().toUpperCase();if(!c)return;
+  try{
+    const s=await getDoc(doc(db,"rooms",c));
+    if(!s.exists()){$("#lerr").textContent="Room not found";return}
+    const d=s.data();
+    if(!d.players.includes(me.uid)){
+      if(d.players.length>=2){$("#lerr").textContent="Room is full";return}
+      await updateDoc(doc(db,"rooms",c),{players:arrayUnion(me.uid),["names."+me.uid]:(me.displayName||"").split(" ")[0]});
+    }
+    enter(c);
+  }catch(e){console.error("Join room error:",e);$("#lerr").textContent="Could not join the room: "+e.code}
+};
+
+function enter(c){
+  if(unR)unR();if(unM)unM();
+  code=c;room=null;moves=[];localStorage.setItem("gtw-room",c);
+  myWord="";started=false;tossShown=false;round=null;lastTurn=false;
+  unR=onSnapshot(roomRef(),s=>{
+    if(!s.exists()){leave();return}
+    room=s.data();
+    {const r=room.round||0;if(r!==round){round=r;myWord=localStorage.getItem(wk())||"";started=!!localStorage.getItem(sk());tossShown=false;$("#w").value="";$("#werr").textContent="";$("#guess").value=""}}
+    {const tn=room.turn;if(lastTurn&&lastTurn!==me.uid&&tn===me.uid&&!room.winner&&started)ting();lastTurn=tn}
+    const opp=room.players.find(p=>p!==me.uid);
+    if(room.host===me.uid&&opp&&room.len[me.uid]&&room.len[opp]&&!room.first){
+      const f=Math.random()<.5?me.uid:opp;
+      updateDoc(roomRef(),{first:f,turn:f});
+    }
+    render();
+  },()=>leave());
+  unM=onSnapshot(movesRef(),s=>{
+    moves=s.docs.map(d=>({ref:d.ref,id:d.id,...d.data()})).sort((a,b)=>a.t-b.t);
+    answer();render();
+  });
+}
+function leave(){
+  if(unR)unR();if(unM)unM();unR=unM=null;
+  localStorage.removeItem("gtw-room");code=null;room=null;moves=[];
+  if(me)show("lobby");
+}
+$("#start").onclick=()=>{started=true;localStorage.setItem(sk(),"1");render();if(room&&room.turn===me.uid)ting()};
+$("#again").onclick=async()=>{
+  if(!room||!room.winner)return;
+  try{await updateDoc(roomRef(),{round:(room.round||0)+1,len:{},first:deleteField(),turn:deleteField(),winner:deleteField()})}
+  catch(e){console.error("Play again error:",e)}
+};
+$("#home").onclick=()=>{
+  if(!code){show("lobby");return}
+  if(room&&room.first&&!room.winner&&!confirm("Leave this game?"))return;
+  leave();
+};
+$("#leave1").onclick=leave;$("#leave2").onclick=leave;
+
+$("#done").onclick=async()=>{
+  const v=$("#w").value.trim().toUpperCase();
+  if(v.length>20){$("#werr").textContent="Your word is too long. The maximum is 20 letters.";return}
+  if(!/^[A-Z]{3,20}$/.test(v)){$("#werr").textContent="Use 3 to 20 letters, A to Z only.";return}
+  myWord=v;localStorage.setItem(wk(),v);
+  await updateDoc(roomRef(),{["len."+me.uid]:v.length});
+};
+
+// My browser answers my friend's questions about my secret word.
+let ac=null;
+function audio(){
+  if(!ac){const A=window.AudioContext||window.webkitAudioContext;if(A)ac=new A()}
+  if(ac&&ac.state==="suspended")ac.resume();
+  return ac;
+}
+document.addEventListener("pointerdown",audio);
+function tone(a,at,f,g,d,type){
+  const o=a.createOscillator(),n=a.createGain();
+  o.type=type;o.frequency.value=f;
+  n.gain.setValueAtTime(0.0001,at);n.gain.linearRampToValueAtTime(g,at+.005);n.gain.exponentialRampToValueAtTime(.0001,at+d);
+  o.connect(n);n.connect(a.destination);o.start(at);o.stop(at+d+.02);
+}
+function ting(){
+  const a=audio();if(!a||a.state!=="running")return;
+  const t=a.currentTime;
+  tone(a,t,1318.5,.3,1.2,"sine");tone(a,t,1976,.12,.9,"sine");tone(a,t,2637,.06,.6,"sine");
+}
+function coin(){
+  const a=audio();if(!a||a.state!=="running")return;
+  const t=a.currentTime;let at=t,gap=.13;
+  while(at<t+1.4){tone(a,at,3200+Math.random()*500,.07,.07,"triangle");gap=Math.max(.045,gap*.93);at+=gap}
+  tone(a,t+1.5,2400,.22,.35,"triangle");tone(a,t+1.5,3600,.12,.25,"triangle");tone(a,t+1.62,2900,.1,.2,"triangle");
+}
+function confetti(){
+  if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+  const c=$("#cf"),x=c.getContext("2d");
+  c.width=innerWidth;c.height=innerHeight;c.hidden=false;
+  const cols=["#f0a82b","#2a8a63","#c4533b","#3b82c4","#a855c7","#f2d03b"];
+  const P=Array.from({length:110},()=>({x:Math.random()*c.width,y:-20-Math.random()*c.height*.6,w:5+Math.random()*7,h:8+Math.random()*10,vy:2+Math.random()*3.5,vx:-1+Math.random()*2,a:Math.random()*6.28,va:-.2+Math.random()*.4,col:cols[Math.random()*cols.length|0]}));
+  const t0=performance.now();
+  (function f(t){
+    const e=t-t0;x.clearRect(0,0,c.width,c.height);
+    P.forEach(p=>{
+      p.x+=p.vx;p.y+=p.vy;p.a+=p.va;
+      if(e<4200&&p.y>c.height+20){p.y=-20;p.x=Math.random()*c.width}
+      x.save();x.translate(p.x,p.y);x.rotate(p.a);x.fillStyle=p.col;x.fillRect(-p.w/2,-p.h/2,p.w,p.h);x.restore();
+    });
+    if(e<5000)requestAnimationFrame(f);else{x.clearRect(0,0,c.width,c.height);c.hidden=true}
+  })(t0);
+}
+const HELP={
+bn:[
+"Google দিয়ে সাইন-ইন করুন। একজন “Create a room” চেপে রুম বানাবে এবং ৫ অক্ষরের রুম কোডটি বন্ধুকে পাঠাবে। বন্ধু “Join” চেপে সেই কোড লিখে ঢুকবে।",
+"“Type your word” অংশে প্রত্যেকে নিজের একটি গোপন শব্দ (৩ থেকে ২০ অক্ষরের, ইংরেজি অক্ষরে) লিখবে। আপনার শব্দ বন্ধু কখনো দেখতে পাবে না, শুধু কত অক্ষরের শব্দ সেটা দেখবে।",
+"টস করে ঠিক হবে কে আগে প্রশ্ন করবে। তারপর “Start game” চাপুন।",
+"আপনার পালা এলে বন্ধুর শব্দের একটি অক্ষর অনুমান করে A–Z থেকে সেটি চাপুন। অক্ষরটি শব্দে থাকলে কোন position-এ আছে তা দেখাবে এবং খালি বক্সে বসে যাবে। না থাকলে লিখবে There is no “A”। এরপর বন্ধুর পালা।",
+"যেকোনো সময় “type here your guessed word” ঘরে পুরো শব্দটি লিখে Submit চাপতে পারেন। সঠিক হলে “You win”, ভুল হলে “Wrong ans” দেখাবে এবং খেলা চলতে থাকবে।",
+"কেউ অন্যজনের শব্দ সঠিক বলতে পারলে খেলা শেষ। খেলার সময় দুজনকেই পেজ খোলা রাখতে হবে।"],
+en:[
+"Sign in with Google. One player taps “Create a room” and sends the 5-letter room code to a friend. The friend taps “Join” and enters the code.",
+"Under “Type your word”, each player types a secret word (3 to 20 letters, English alphabet). Your friend never sees your word, only how many letters it has.",
+"A coin toss decides who asks first. Then tap “Start game”.",
+"On your turn, guess a letter of your friend’s word by tapping it in the A–Z list. If it is in the word, the game shows its position and fills the box. If not, it says There is no “A”. Then it is your friend’s turn.",
+"At any time you can type the whole word in “type here your guessed word” and tap Submit. A correct guess shows “You win”. A wrong one shows “Wrong ans” and the game goes on.",
+"The game ends when someone guesses the other player’s word. Both players must keep the page open while playing."]
+};
+function setHelp(l){
+  $("#hb").innerHTML='<ol class="h">'+HELP[l].map(t=>"<li>"+t+"</li>").join("")+"</ol>";
+  $("#lb").classList.toggle("on",l==="bn");$("#le").classList.toggle("on",l==="en");
+}
+$("#how").onclick=()=>{setHelp("bn");$("#help").hidden=false};
+$("#hx").onclick=()=>{$("#help").hidden=true};
+$("#help").addEventListener("click",e=>{if(e.target.id==="help")$("#help").hidden=true});
+$("#lb").onclick=()=>setHelp("bn");$("#le").onclick=()=>setHelp("en");
+document.addEventListener("keydown",e=>{if(e.key==="Escape")$("#help").hidden=true});
+
+function answer(){
+  if(!myWord||!code||!room)return;
+  curMoves().forEach(async m=>{
+    if(m.by===me.uid||m.answer||busy.has(m.id))return;
+    busy.add(m.id);
+    try{
+      if(m.kind==="letter"){
+        const pos=[];[...myWord].forEach((c,i)=>{if(c===m.value)pos.push(i+1)});
+        await updateDoc(m.ref,{answer:{pos}});
+        await updateDoc(roomRef(),{turn:me.uid});
+      }else{
+        const ok=m.value===myWord;
+        await updateDoc(m.ref,{answer:{ok}});
+        if(ok)await updateDoc(roomRef(),{winner:m.by});
+      }
+    }catch(e){busy.delete(m.id)}
+  });
+}
+
+function render(){
+  if(!room||!me)return;
+  const opp=room.players.find(p=>p!==me.uid);
+  $("#rc").textContent="";
+  if(!opp){
+    $("#wt").textContent="Waiting for your friend\u2026";$("#rc").textContent=code;
+    $("#wp").textContent="Send this room code to your friend. They tap Join and enter it.";show("wait");return;
+  }
+  if(!room.len[me.uid]){show("word");return}
+  if(!room.len[opp]){
+    $("#wt").textContent="Waiting for your friend to type their word\u2026";$("#wp").textContent="";show("wait");return;
+  }
+  if(!room.first){
+    $("#wt").textContent="Tossing the coin\u2026";$("#wp").textContent="";show("wait");return;
+  }
+  if(!started){
+    show("toss");
+    if(!tossShown){
+      tossShown=true;
+      const c=$("#coin");c.textContent="?";$("#tossres").textContent="";$("#start").hidden=true;
+      c.classList.remove("spin");void c.offsetWidth;c.classList.add("spin");coin();
+      setTimeout(()=>{
+        const win=room&&room.first===me.uid;
+        c.textContent=win?"Y":"F";
+        $("#tossres").textContent=win?"You won the toss. You ask first.":"Your friend won the toss and asks first.";
+        $("#start").hidden=false;
+      },1500);
+    }
+    return;
+  }
+  show("game");
+  const mine=curMoves().filter(m=>m.by===me.uid),theirs=curMoves().filter(m=>m.by!==me.uid);
+  const n=room.len[opp],rev=Array(n).fill(""),used=new Set();
+  mine.forEach(m=>{if(m.kind==="letter"){used.add(m.value);(m.answer?.pos||[]).forEach(p=>rev[p-1]=m.value)}});
+  const pending=mine.some(m=>m.kind==="letter"&&!m.answer);
+  const over=!!room.winner;
+  $("#again").hidden=!over;$("#banner").hidden=!over;
+  $("#secret").hidden=over||!myWord;$("#sw").textContent=myWord;
+  $("#oplabel").textContent=(room.names?.[opp]||"Your friend")+"\u2019s word \u00B7 "+n+" letters";
+  $("#boxes").style.setProperty("--n",n);$("#boxes").innerHTML=rev.map(l=>'<div class="box'+(l?" f":"")+'">'+l+"</div>").join("");
+  $("#alpha").innerHTML="";
+  ALPHA.forEach(l=>{
+    const b=document.createElement("button");b.textContent=l;
+    const hit=used.has(l)&&rev.includes(l);
+    if(used.has(l))b.className=hit?"hit":"miss";
+    b.disabled=over||pending||room.turn!==me.uid||used.has(l);
+    b.onclick=()=>pick(l);$("#alpha").appendChild(b);
+  });
+  const lm=[...mine].reverse().find(m=>m.kind==="letter"&&m.answer);
+  $("#msg").textContent=lm?say(lm.value,lm.answer.pos):"";
+  const lw=[...mine].reverse().find(m=>m.kind==="word"&&m.answer);
+  const r=$("#res");
+  if(over){
+    const w=room.winner===me.uid;
+    r.textContent="";r.className="res";
+    $("#banner").className="banner "+(w?"win":"bad");$("#banner").textContent=w?"🏆 YOU WIN!":"GAME OVER!";
+    const ck="gtw-cel-"+code+"-"+(room.round||0);
+    if(!localStorage.getItem(ck)){localStorage.setItem(ck,"1");if(w)confetti()}
+  }else if(lw){r.textContent=lw.answer.ok?"You win":"Wrong ans";r.className="res "+(lw.answer.ok?"win":"bad")}
+  else{r.textContent="";r.className="res"}
+  $("#turn").textContent=over?"Game over":pending?"Waiting for the answer\u2026":room.turn===me.uid?"Your turn: pick a letter":"Your friend\u2019s turn\u2026";
+  $("#log").innerHTML=[...theirs].reverse().filter(m=>m.kind==="letter"&&m.answer)
+    .map(m=>"<li>Friend asked \u201C"+m.value+"\u201D about your word: "+say(m.value,m.answer.pos)+"</li>").join("");
+}
+
+async function pick(l){
+  if(!room||room.winner||room.turn!==me.uid)return;
+  if(curMoves().some(m=>m.by===me.uid&&m.kind==="letter"&&(m.value===l||!m.answer)))return;
+  await addDoc(movesRef(),{by:me.uid,kind:"letter",value:l,r:room.round||0,t:Date.now(),answer:null});
+}
+$("#sub").onclick=async()=>{
+  const v=$("#guess").value.trim().toUpperCase();
+  if(!v||!room||room.winner)return;
+  $("#guess").value="";
+  await addDoc(movesRef(),{by:me.uid,kind:"word",value:v,r:room.round||0,t:Date.now(),answer:null});
+};
+$("#guess").addEventListener("keydown",e=>{if(e.key==="Enter")$("#sub").click()});
+</script>
+</body>
+</html>
